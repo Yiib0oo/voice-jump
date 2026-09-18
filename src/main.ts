@@ -43,7 +43,7 @@ startButton.addEventListener("click", async () => {
     detector.setTriggerLevel(calibration.triggerLevel);
     updateThresholdMark(calibration.triggerLevel);
 
-    audioStatus.textContent = "短喊短跳，稍长喊长跳；先安静下来再喊下一次";
+    audioStatus.textContent = "高／宽障碍请稍长喊；先安静下来再喊下一次";
     startButton.hidden = true;
     detector.reset();
     game.start();

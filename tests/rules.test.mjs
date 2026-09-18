@@ -77,6 +77,8 @@ test('蓄力在安静30ms后停止，但仍需80ms安静才能重新触发', () 
 test('从初速到接近上限，1500个障碍均保留起跳窗口及落地恢复间隔', () => {
   const kinds = new Set();
   const shapes = new Set();
+  let longOnly = 0;
+  let shortAvailable = 0;
   let minWindow = Infinity;
   let minRecovery = Infinity;
   for (const seed of [7, 42, 2026]) {
@@ -84,9 +86,13 @@ test('从初速到接近上限，1500个障碍均保留起跳窗口及落地恢�
     let readyAt = 0;
     for (let i = 0; i < 500; i++) {
       const obstacle = planner.next();
+      assert.ok(obstacle.width >= 60 && obstacle.width <= 124);
+      assert.ok(obstacle.height >= 52 && obstacle.height <= 124);
+      if (obstacle.shortWindow) shortAvailable++; else longOnly++;
       kinds.add(obstacle.kind);
       shapes.add(`${Math.round(obstacle.width)}x${Math.round(obstacle.height)}`);
       for (const [held, window] of [[false, obstacle.shortWindow], [true, obstacle.longWindow]]) {
+        if (!window) continue;
         const width = window.end - window.start;
         minWindow = Math.min(minWindow, width);
         assert.ok(width >= 0.12 - 1e-8);
@@ -97,19 +103,20 @@ test('从初速到接近上限，1500个障碍均保留起跳窗口及落地恢�
         }
       }
       if (i > 0) minRecovery = Math.min(minRecovery,
-        Math.min(obstacle.shortWindow.start, obstacle.longWindow.start) - readyAt + RESET_SECONDS);
-      readyAt = Math.max(obstacle.shortWindow.end + flightDuration(false),
+        Math.min(obstacle.shortWindow?.start ?? Infinity, obstacle.longWindow.start) - readyAt + RESET_SECONDS);
+      readyAt = Math.max(obstacle.shortWindow ? obstacle.shortWindow.end + flightDuration(false) : 0,
         obstacle.longWindow.end + flightDuration(true)) + RESET_SECONDS;
     }
   }
   assert.equal(kinds.size, 5);
+  assert.ok(longOnly > 0 && shortAvailable > 0);
   assert.ok(shapes.size > 20);
-  console.log({ obstacleTypes: kinds.size, obstacleShapes: shapes.size,
+  console.log({ obstacleTypes: kinds.size, obstacleShapes: shapes.size, longOnly, shortAvailable,
     minWindowSeconds: minWindow, minRecoverySeconds: minRecovery,
     shortFlight: flightDuration(false), longFlight: flightDuration(true), speedAtTenMinutes: speedAt(600) });
 });
 
-test('完整连续跑道：短跳、长跳、混合时长，真实步进不中断通过300个障碍', () => {
+test('完整连续跑道：优先短跳、全部长跳、混合时长，按障碍选择可用跳法通过300个障碍', () => {
   for (const mode of ['short', 'long', 'mixed']) {
     const planner = new ObstaclePlanner(seeded(123));
     const obstacles = Array.from({ length: 300 }, () => planner.next());
@@ -120,13 +127,14 @@ test('完整连续跑道：短跳、长跳、混合时长，真实步进不中�
     for (let time = 0; time < obstacles.at(-1).arrival + 1; time += STEP) {
       const obstacle = obstacles[next];
       if (obstacle) {
-        // 短长共有窗口允许无需精确判断喊声长短，也能通过。
-        const window = mode === 'long' ? obstacle.longWindow : obstacle.shortWindow;
+        // 大障碍需要长跳，矮障碍优先短跳；两种选择都要留出连续落地时间。
+        const useLong = mode === 'long' || !obstacle.shortWindow;
+        const window = useLong ? obstacle.longWindow : obstacle.shortWindow;
         const fraction = next % 2 ? 0.1 : 0.9;
         const start = window.start + (window.end - window.start) * fraction;
         if (time >= start) {
           assert.equal(beginJump(body), true, `${mode}: 第${next}跳尚未落地`);
-          holdDuration = mode === 'short' ? 0 : mode === 'long' ? 1 : [0.04, 0.08, 0.15, 0.25][next % 4];
+          holdDuration = useLong ? 1 : mode === 'short' ? 0 : [0.04, 0.08, 0.15, 0.25][next % 4];
           next++;
         }
       }

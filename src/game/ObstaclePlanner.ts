@@ -2,10 +2,11 @@ import { STEP, GROUND_Y, PLAYER, RESET_SECONDS, START_SPEED, MAX_SPEED, beginJum
   flightDuration, intersects, speedAt, stepBody } from "./physics.ts";
 export type Window = { start: number; end: number };
 export type ObstacleKind = "goomba" | "shell" | "pipe" | "bricks" | "koopa";
+export const OBSTACLE_SCALE = 2;
 export type PlannedObstacle = {
   kind: ObstacleKind;
   arrival: number; width: number; height: number; passed: boolean;
-  shortWindow: Window; longWindow: Window;
+  shortWindow: Window | null; longWindow: Window;
 };
 export function obstacleX(obstacle: Pick<PlannedObstacle, "arrival" | "width">, time: number): number {
   return PLAYER.x + PLAYER.width / 2 - obstacle.width / 2 +
@@ -66,22 +67,25 @@ export class ObstaclePlanner {
       }[kind];
       const obstacle: PlannedObstacle = {
         kind, arrival,
-        width: fallback ? 30 : shape.width + this.random() * shape.dw,
-        height: fallback ? 28 : shape.height + this.random() * shape.dh * (0.5 + difficulty * 0.5), passed: false,
+        width: OBSTACLE_SCALE * (fallback ? 30 : shape.width + this.random() * shape.dw),
+        height: OBSTACLE_SCALE * (fallback ? 28 : shape.height + this.random() * shape.dh * (0.5 + difficulty * 0.5)), passed: false,
         shortWindow: { start: 0, end: 0 }, longWindow: { start: 0, end: 0 },
       };
-      const short = findWindow(obstacle, false);
+      const shortCandidate = findWindow(obstacle, false);
       const long = findWindow(obstacle, true);
-      if (!short || !long || short.end - short.start < minimumWindow ||
-        long.end - long.start < minimumWindow) continue;
-      const earliest = Math.min(short.start, long.start);
+      // 大障碍允许需要长跳，但仍必须保留可用的长跳窗口。
+      if (!long || long.end - long.start < minimumWindow) continue;
+      const short = shortCandidate && shortCandidate.end - shortCandidate.start >= minimumWindow
+        ? shortCandidate : null;
+      const earliest = Math.min(short?.start ?? Infinity, long.start);
       if (earliest < this.readyAt) {
         arrival += this.readyAt - earliest + STEP * 3;
         continue;
       }
       obstacle.shortWindow = short;
       obstacle.longWindow = long;
-      this.readyAt = Math.max(short.end + this.shortFlight, long.end + this.longFlight) + RESET_SECONDS;
+      this.readyAt = Math.max(short ? short.end + this.shortFlight : 0,
+        long.end + this.longFlight) + RESET_SECONDS;
       this.previousArrival = arrival;
       this.nextKind++;
       return obstacle;
