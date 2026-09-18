@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f4f1e8" />
+    <title>呐喊跳跳</title>
+  </head>
+  <body>
+    <main class="app">
+      <header class="status-bar" aria-live="polite">
+        <span id="game-status">准备开始</span>
+        <span>分数：<strong id="score">0</strong></span>
+      </header>
+
+      <canvas id="game" aria-label="呐喊跳跳游戏画面"></canvas>
+
+      <section class="controls">
+        <button id="start-button" type="button">开启麦克风并开始</button>
+        <button id="restart-button" type="button" hidden>重新开始</button>
+        <div class="meter" aria-label="当前声音能量">
+          <div id="meter-fill" class="meter__fill"></div>
+          <div id="threshold-mark" class="meter__threshold"></div>
+        </div>
+        <p id="audio-status">短喊短跳，稍长喊长跳。也可轻点／按住空格测试；持续发声不会自动连跳。</p>
+      </section>
+    </main>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
