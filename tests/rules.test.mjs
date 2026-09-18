@@ -11,7 +11,7 @@ function seeded(seed) {
 
 test('短跳更快落地，长跳有上限，松开后不能在空中重新蓄力', () => {
   assert.ok(flightDuration(false) >= 0.46 && flightDuration(false) <= 0.51);
-  assert.ok(flightDuration(true) >= 0.60 && flightDuration(true) <= 0.65);
+  assert.ok(flightDuration(true) >= 0.75 && flightDuration(true) <= 0.85);
   const body = createBody();
   beginJump(body);
   stepBody(body, false);
@@ -31,6 +31,47 @@ test('持续喊不连跳，短暂噪声谷值不重新触发，安静后允许�
   detector.update(0, 2190);
   assert.equal(detector.isHeld(), false);
   assert.equal(detector.update(0.1, 2200), true);
+});
+
+test('声音到物理：短促发声与持续发声具有明显高度差', () => {
+  function simulateVoice(duration) {
+    const body = createBody();
+    const detector = new VoiceJumpDetector({ triggerLevel: 0.05, releaseRatio: 0.55, cooldownMs: 280 });
+    let peak = 0;
+    let jumps = 0;
+    // 模拟60Hz音量采样与120Hz物理步进。
+    for (let frame = 0; frame < 240; frame++) {
+      const time = frame * STEP;
+      if (frame % 2 === 0 && detector.update(time < duration ? 0.1 : 0, time * 1000)) {
+        assert.equal(beginJump(body), true);
+        jumps++;
+      }
+      stepBody(body, detector.isHeld());
+      peak = Math.max(peak, GROUND_Y - PLAYER.height - body.y);
+    }
+    assert.equal(jumps, 1);
+    return { peak, flight: body.age };
+  }
+  const short = simulateVoice(0.05);
+  const long = simulateVoice(0.30);
+  assert.ok(long.peak > short.peak * 1.5);
+  assert.ok(long.flight > short.flight + 0.15);
+  assert.ok(long.peak < GROUND_Y - PLAYER.height); // 角色不跳出画面。
+  console.log({ shortVoice: short, longVoice: long });
+});
+
+test('蓄力在安静30ms后停止，但仍需80ms安静才能重新触发', () => {
+  const detector = new VoiceJumpDetector({ triggerLevel: 0.05, releaseRatio: 0.55, cooldownMs: 280 });
+  detector.update(0.1, 0);
+  detector.update(0, 300);
+  detector.update(0, 316);
+  assert.equal(detector.isHeld(), true);
+  detector.update(0, 332);
+  assert.equal(detector.isHeld(), false);
+  assert.equal(detector.update(0.1, 350), false);
+  detector.update(0, 400);
+  detector.update(0, 480);
+  assert.equal(detector.update(0.1, 500), true);
 });
 
 test('从初速到接近上限，1500个障碍均保留起跳窗口及落地恢复间隔', () => {
@@ -78,7 +119,7 @@ test('完整连续跑道：短跳、长跳、混合时长，真实步进不中�
         const start = window.start + (window.end - window.start) * fraction;
         if (time >= start) {
           assert.equal(beginJump(body), true, `${mode}: 第${next}跳尚未落地`);
-          holdDuration = mode === 'short' ? 0 : mode === 'long' ? 1 : [0.04, 0.08, 0.12, 0.15][next % 4];
+          holdDuration = mode === 'short' ? 0 : mode === 'long' ? 1 : [0.04, 0.08, 0.15, 0.25][next % 4];
           next++;
         }
       }

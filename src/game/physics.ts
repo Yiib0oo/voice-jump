@@ -1,7 +1,7 @@
 export const STEP = 1 / 120;
 export const GROUND_Y = 350;
 export const PLAYER = { x: 90, width: 42, height: 48 };
-export const HOLD_SECONDS = 0.15;
+export const HOLD_SECONDS = 0.25;
 export const RESET_SECONDS = 0.18;
 export const START_SPEED = 390;
 export const MAX_SPEED = 660;
@@ -24,7 +24,7 @@ export function stepBody(body: JumpBody, held: boolean): void {
   if (!body.active) return;
   if (!held) body.released = true;
   const boost = !body.released && body.age < HOLD_SECONDS;
-  const gravity = body.velocityY >= 0 ? 5400 : boost ? 1000 : 2400;
+  const gravity = body.velocityY >= 0 ? 5400 : boost ? 500 : 2400;
   body.velocityY += gravity * STEP;
   body.y += body.velocityY * STEP;
   body.age += STEP;

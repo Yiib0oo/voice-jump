@@ -3,6 +3,7 @@ export type VoiceJumpConfig = {
   releaseRatio: number;
   cooldownMs: number;
   releaseMs?: number;
+  holdReleaseMs?: number;
 };
 
 export class VoiceJumpDetector {
@@ -29,9 +30,10 @@ export class VoiceJumpDetector {
   update(level: number, now: number): boolean {
     const releaseLevel = this.config.triggerLevel * this.config.releaseRatio;
 
-    // 短暂的音量谷值不切断长喊；连续安静 80ms 后才能发起下一跳。
+    // 停止蓄力和下一声解锁分开：避免把短喊额外延长 80ms。
     if (level <= releaseLevel) {
       this.quietSince ??= now;
+      if (now - this.quietSince >= (this.config.holdReleaseMs ?? 30)) this.held = false;
       if (now - this.quietSince >= (this.config.releaseMs ?? 80)) {
         this.armed = true;
         this.held = false;
