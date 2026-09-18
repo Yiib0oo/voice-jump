@@ -8,6 +8,16 @@ export type GameEvents = {
 };
 const WORLD_WIDTH = 900;
 const WORLD_HEIGHT = 420;
+const AVATARS = {
+  normal: {
+    url: new URL("../../图片库/正常付饶.jpg", import.meta.url).href,
+    crop: { x: 350, y: 310, width: 980, height: 1120 },
+  },
+  failed: {
+    url: new URL("../../图片库/失败付饶.jpg", import.meta.url).href,
+    crop: { x: 35, y: 160, width: 392, height: 448 },
+  },
+};
 
 export class Game {
   private readonly context: CanvasRenderingContext2D;
@@ -21,12 +31,18 @@ export class Game {
   private held = false;
   private planner = new ObstaclePlanner();
   private obstacles: PlannedObstacle[] = [];
+  private readonly avatars = { normal: new Image(), failed: new Image() };
 
   constructor(private readonly canvas: HTMLCanvasElement, private readonly events: GameEvents = {}) {
     const context = canvas.getContext("2d");
     if (!context) throw new Error("无法创建 Canvas 画布");
     this.context = context;
     this.resize();
+    for (const variant of ["normal", "failed"] as const) {
+      // 提前加载两种表情，图片完成加载时按当前状态重绘。
+      this.avatars[variant].onload = () => this.draw();
+      this.avatars[variant].src = AVATARS[variant].url;
+    }
     window.addEventListener("resize", this.resize);
     document.addEventListener("visibilitychange", () => {
       this.lastFrameAt = performance.now();
@@ -109,11 +125,22 @@ export class Game {
     ctx.moveTo(0, GROUND_Y);
     ctx.lineTo(WORLD_WIDTH, GROUND_Y);
     ctx.stroke();
-    ctx.fillStyle = "#252525";
-    ctx.fillRect(PLAYER.x, this.body.y, PLAYER.width, PLAYER.height);
     ctx.fillStyle = "#d44747";
     for (const obstacle of this.obstacles) {
       ctx.fillRect(obstacleX(obstacle, this.elapsed), GROUND_Y - obstacle.height, obstacle.width, obstacle.height);
+    }
+    const variant = this.state === "game-over" ? "failed" : "normal";
+    const avatar = this.avatars[variant];
+    const crop = AVATARS[variant].crop;
+    if (avatar.complete && avatar.naturalWidth > 0) {
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(avatar, crop.x, crop.y,
+        crop.width, crop.height,
+        PLAYER.x, this.body.y, PLAYER.width, PLAYER.height);
+    } else {
+      ctx.fillStyle = "#252525";
+      ctx.fillRect(PLAYER.x, this.body.y, PLAYER.width, PLAYER.height);
     }
     ctx.fillStyle = "#626262";
     ctx.font = "16px system-ui, sans-serif";
