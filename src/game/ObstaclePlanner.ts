@@ -1,7 +1,9 @@
 import { STEP, GROUND_Y, PLAYER, RESET_SECONDS, START_SPEED, MAX_SPEED, beginJump, createBody, distanceAt,
   flightDuration, intersects, speedAt, stepBody } from "./physics.ts";
 export type Window = { start: number; end: number };
+export type ObstacleKind = "goomba" | "shell" | "pipe" | "bricks" | "koopa";
 export type PlannedObstacle = {
+  kind: ObstacleKind;
   arrival: number; width: number; height: number; passed: boolean;
   shortWindow: Window; longWindow: Window;
 };
@@ -40,6 +42,7 @@ function findWindow(obstacle: PlannedObstacle, held: boolean): Window | null {
 export class ObstaclePlanner {
   private previousArrival = 0;
   private readyAt = 0;
+  private nextKind = 0;
   private readonly shortFlight = flightDuration(false);
   private readonly longFlight = flightDuration(true);
   private readonly random: () => number;
@@ -47,14 +50,24 @@ export class ObstaclePlanner {
 
   next(): PlannedObstacle {
     const difficulty = (speedAt(this.previousArrival) - START_SPEED) / (MAX_SPEED - START_SPEED);
+    const kinds: ObstacleKind[] = ["goomba", "pipe", "shell", "bricks", "koopa"];
+    const kind = kinds[this.nextKind % kinds.length];
     let arrival = this.previousArrival === 0 ? 3.1 :
-      this.previousArrival + 1.65 - difficulty * 0.48 + this.random() * 0.3;
+      this.previousArrival + 1.48 - difficulty * 0.38 + this.random() * 0.28;
     const minimumWindow = 0.18 - difficulty * 0.06;
     for (let attempt = 0; attempt < 24; attempt++) {
       const fallback = attempt >= 12;
+      const shape = {
+        goomba: { width: 38, height: 30, dw: 16, dh: 14 },
+        shell: { width: 42, height: 26, dw: 20, dh: 12 },
+        pipe: { width: 34, height: 38, dw: 16, dh: 24 },
+        bricks: { width: 38, height: 32, dw: 24, dh: 20 },
+        koopa: { width: 30, height: 34, dw: 18, dh: 24 },
+      }[kind];
       const obstacle: PlannedObstacle = {
-        arrival, width: fallback ? 24 : 24 + this.random() * (12 + difficulty * 10),
-        height: fallback ? 32 : 32 + this.random() * (18 + difficulty * 20), passed: false,
+        kind, arrival,
+        width: fallback ? 30 : shape.width + this.random() * shape.dw,
+        height: fallback ? 28 : shape.height + this.random() * shape.dh * (0.5 + difficulty * 0.5), passed: false,
         shortWindow: { start: 0, end: 0 }, longWindow: { start: 0, end: 0 },
       };
       const short = findWindow(obstacle, false);
@@ -70,6 +83,7 @@ export class ObstaclePlanner {
       obstacle.longWindow = long;
       this.readyAt = Math.max(short.end + this.shortFlight, long.end + this.longFlight) + RESET_SECONDS;
       this.previousArrival = arrival;
+      this.nextKind++;
       return obstacle;
     }
     throw new Error("无法生成具有足够起跳窗口的障碍");

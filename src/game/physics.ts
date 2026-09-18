@@ -1,6 +1,6 @@
 export const STEP = 1 / 120;
 export const GROUND_Y = 350;
-export const PLAYER = { x: 90, width: 42, height: 48 };
+export const PLAYER = { x: 90, width: 60, height: 68 };
 export const HOLD_SECONDS = 0.25;
 export const RESET_SECONDS = 0.18;
 export const START_SPEED = 390;

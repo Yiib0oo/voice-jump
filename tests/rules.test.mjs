@@ -75,6 +75,8 @@ test('蓄力在安静30ms后停止，但仍需80ms安静才能重新触发', () 
 });
 
 test('从初速到接近上限，1500个障碍均保留起跳窗口及落地恢复间隔', () => {
+  const kinds = new Set();
+  const shapes = new Set();
   let minWindow = Infinity;
   let minRecovery = Infinity;
   for (const seed of [7, 42, 2026]) {
@@ -82,6 +84,8 @@ test('从初速到接近上限，1500个障碍均保留起跳窗口及落地恢�
     let readyAt = 0;
     for (let i = 0; i < 500; i++) {
       const obstacle = planner.next();
+      kinds.add(obstacle.kind);
+      shapes.add(`${Math.round(obstacle.width)}x${Math.round(obstacle.height)}`);
       for (const [held, window] of [[false, obstacle.shortWindow], [true, obstacle.longWindow]]) {
         const width = window.end - window.start;
         minWindow = Math.min(minWindow, width);
@@ -98,7 +102,10 @@ test('从初速到接近上限，1500个障碍均保留起跳窗口及落地恢�
         obstacle.longWindow.end + flightDuration(true)) + RESET_SECONDS;
     }
   }
-  console.log({ minWindowSeconds: minWindow, minRecoverySeconds: minRecovery,
+  assert.equal(kinds.size, 5);
+  assert.ok(shapes.size > 20);
+  console.log({ obstacleTypes: kinds.size, obstacleShapes: shapes.size,
+    minWindowSeconds: minWindow, minRecoverySeconds: minRecovery,
     shortFlight: flightDuration(false), longFlight: flightDuration(true), speedAtTenMinutes: speedAt(600) });
 });
 

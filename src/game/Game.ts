@@ -1,5 +1,6 @@
 import { STEP, GROUND_Y, PLAYER, START_SPEED, beginJump, createBody, intersects, speedAt, stepBody } from "./physics.ts";
 import { ObstaclePlanner, obstacleX, type PlannedObstacle } from "./ObstaclePlanner.ts";
+import { SceneRenderer } from "./SceneRenderer.ts";
 
 export type GameState = "idle" | "running" | "game-over";
 export type GameEvents = {
@@ -8,16 +9,6 @@ export type GameEvents = {
 };
 const WORLD_WIDTH = 900;
 const WORLD_HEIGHT = 420;
-const AVATARS = {
-  normal: {
-    url: new URL("../../图片库/正常付饶.jpg", import.meta.url).href,
-    crop: { x: 350, y: 310, width: 980, height: 1120 },
-  },
-  failed: {
-    url: new URL("../../图片库/失败付饶.jpg", import.meta.url).href,
-    crop: { x: 35, y: 160, width: 392, height: 448 },
-  },
-};
 
 export class Game {
   private readonly context: CanvasRenderingContext2D;
@@ -31,18 +22,14 @@ export class Game {
   private held = false;
   private planner = new ObstaclePlanner();
   private obstacles: PlannedObstacle[] = [];
-  private readonly avatars = { normal: new Image(), failed: new Image() };
+  private readonly scene: SceneRenderer;
 
   constructor(private readonly canvas: HTMLCanvasElement, private readonly events: GameEvents = {}) {
     const context = canvas.getContext("2d");
     if (!context) throw new Error("无法创建 Canvas 画布");
     this.context = context;
+    this.scene = new SceneRenderer(() => this.draw());
     this.resize();
-    for (const variant of ["normal", "failed"] as const) {
-      // 提前加载两种表情，图片完成加载时按当前状态重绘。
-      this.avatars[variant].onload = () => this.draw();
-      this.avatars[variant].src = AVATARS[variant].url;
-    }
     window.addEventListener("resize", this.resize);
     document.addEventListener("visibilitychange", () => {
       this.lastFrameAt = performance.now();
@@ -118,36 +105,19 @@ export class Game {
 
   private draw(): void {
     const ctx = this.context;
-    ctx.clearRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
-    ctx.strokeStyle = "#252525";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(0, GROUND_Y);
-    ctx.lineTo(WORLD_WIDTH, GROUND_Y);
-    ctx.stroke();
-    ctx.fillStyle = "#d44747";
+    this.scene.background(ctx, this.elapsed);
     for (const obstacle of this.obstacles) {
-      ctx.fillRect(obstacleX(obstacle, this.elapsed), GROUND_Y - obstacle.height, obstacle.width, obstacle.height);
+      this.scene.obstacle(ctx, obstacle, this.elapsed);
     }
-    const variant = this.state === "game-over" ? "failed" : "normal";
-    const avatar = this.avatars[variant];
-    const crop = AVATARS[variant].crop;
-    if (avatar.complete && avatar.naturalWidth > 0) {
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = "high";
-      ctx.drawImage(avatar, crop.x, crop.y,
-        crop.width, crop.height,
-        PLAYER.x, this.body.y, PLAYER.width, PLAYER.height);
-    } else {
-      ctx.fillStyle = "#252525";
-      ctx.fillRect(PLAYER.x, this.body.y, PLAYER.width, PLAYER.height);
-    }
-    ctx.fillStyle = "#626262";
+    this.scene.player(ctx, this.body, this.elapsed, this.state);
+    ctx.fillStyle = "#ffffff";
     ctx.font = "16px system-ui, sans-serif";
     ctx.textAlign = "right";
     ctx.fillText(`速度 ×${(speedAt(this.elapsed) / START_SPEED).toFixed(2)}`, WORLD_WIDTH - 20, 32);
     if (this.state !== "running") {
-      ctx.fillStyle = "#252525";
+      ctx.fillStyle = "rgba(21, 40, 78, 0.8)";
+      ctx.fillRect(WORLD_WIDTH / 2 - 225, 104, 450, 48);
+      ctx.fillStyle = "#ffffff";
       ctx.font = "22px system-ui, sans-serif";
       ctx.textAlign = "center";
       ctx.fillText(this.state === "idle" ? "短喊短跳，稍长喊长跳" : "撞到了，点击重新开始", WORLD_WIDTH / 2, 130);
