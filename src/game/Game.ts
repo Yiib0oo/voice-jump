@@ -54,8 +54,8 @@ export class Game {
     this.animationFrame = requestAnimationFrame(this.tick);
   }
 
-  jump(): void {
-    if (this.state === "running") beginJump(this.body);
+  jump(): boolean {
+    return this.state === "running" && beginJump(this.body);
   }
   setHeld(held: boolean): void { this.held = held; }
   getState(): GameState { return this.state; }
@@ -120,7 +120,7 @@ export class Game {
       ctx.fillStyle = "#ffffff";
       ctx.font = "22px system-ui, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText(this.state === "idle" ? "短喊短跳，稍长喊长跳" : "撞到了，点击重新开始", WORLD_WIDTH / 2, 130);
+      ctx.fillText(this.state === "idle" ? "轻点短跳，长按长跳；也可开启声控" : "撞到了，轻点画面重新开始", WORLD_WIDTH / 2, 130);
     }
   }
 }

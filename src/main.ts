@@ -2,6 +2,7 @@ import "./styles.css";
 import { MicrophoneInput } from "./audio/MicrophoneInput";
 import { Game, type GameState } from "./game/Game";
 import { VoiceJumpDetector } from "./input/VoiceJumpDetector";
+import { PointerJumpInput } from "./input/PointerJumpInput";
 
 const canvas = requireElement<HTMLCanvasElement>("game");
 const startButton = requireElement<HTMLButtonElement>("start-button");
@@ -28,7 +29,28 @@ const game = new Game(canvas, {
 
 let audioLoopId = 0;
 let keyboardHeld = false;
-let jumpSource: "keyboard" | "voice" | null = null;
+let jumpSource: "keyboard" | "voice" | "pointer" | null = null;
+const pointer = new PointerJumpInput(canvas, () => {
+  if (startButton.disabled && !startButton.hidden) return false;
+  if (game.getState() !== "running") { game.start(); detector.reset(); }
+  return beginInputJump("pointer");
+}, () => {
+  if (jumpSource === "pointer") game.setHeld(false);
+});
+
+function beginInputJump(source: "keyboard" | "voice" | "pointer"): boolean {
+  if (!game.jump()) return false;
+  jumpSource = source;
+  game.setHeld(true);
+  return true;
+}
+
+function resetManualInput(): void {
+  pointer.reset();
+  keyboardHeld = false;
+  jumpSource = null;
+  game.setHeld(false);
+}
 
 startButton.addEventListener("click", async () => {
   startButton.disabled = true;
@@ -43,15 +65,16 @@ startButton.addEventListener("click", async () => {
     detector.setTriggerLevel(calibration.triggerLevel);
     updateThresholdMark(calibration.triggerLevel);
 
-    audioStatus.textContent = "高／宽障碍请稍长喊；先安静下来再喊下一次";
+    audioStatus.textContent = "短喊短跳、稍长喊长跳，安静后再喊下一次；也可轻点／长按游戏画面。";
     startButton.hidden = true;
     detector.reset();
+    resetManualInput();
     game.start();
     runAudioLoop();
   } catch (error) {
     await microphone.stop();
     const message = error instanceof Error ? error.message : "无法开启麦克风";
-    audioStatus.textContent = `${message}；仍可按空格键测试`;
+    audioStatus.textContent = `${message}；仍可轻点／长按游戏画面，或使用空格键`;
     startButton.disabled = false;
     startButton.textContent = "再次尝试开启麦克风";
     game.start();
@@ -60,8 +83,7 @@ startButton.addEventListener("click", async () => {
 
 restartButton.addEventListener("click", () => {
   detector.reset();
-  keyboardHeld = false;
-  jumpSource = null;
+  resetManualInput();
   game.start();
 });
 
@@ -72,9 +94,7 @@ window.addEventListener("keydown", (event) => {
 
   if (game.getState() !== "running") { game.start(); detector.reset(); }
   keyboardHeld = true;
-  jumpSource = "keyboard";
-  game.setHeld(true);
-  game.jump();
+  beginInputJump("keyboard");
 });
 
 window.addEventListener("keyup", (event) => {
@@ -82,10 +102,9 @@ window.addEventListener("keyup", (event) => {
   keyboardHeld = false;
   if (jumpSource === "keyboard") game.setHeld(false);
 });
-window.addEventListener("blur", () => {
-  keyboardHeld = false;
-  jumpSource = null;
-  game.setHeld(false);
+window.addEventListener("blur", resetManualInput);
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) { resetManualInput(); detector.reset(); }
 });
 
 window.addEventListener("pagehide", () => {
@@ -98,9 +117,8 @@ function runAudioLoop(): void {
   const displayLevel = Math.min(level / 0.3, 1);
   meterFill.style.width = `${displayLevel * 100}%`;
 
-  if (detector.update(level, performance.now()) && !keyboardHeld && !document.hidden) {
-    jumpSource = "voice";
-    game.jump();
+  if (detector.update(level, performance.now()) && !keyboardHeld && !pointer.isHeld() && !document.hidden) {
+    beginInputJump("voice");
   }
   if (jumpSource === "voice") game.setHeld(detector.isHeld() && !document.hidden);
 
