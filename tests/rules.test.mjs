@@ -86,8 +86,8 @@ test('从初速到接近上限，1500个障碍均保留起跳窗口及落地恢�
     let readyAt = 0;
     for (let i = 0; i < 500; i++) {
       const obstacle = planner.next();
-      assert.ok(obstacle.width >= 60 && obstacle.width <= 124);
-      assert.ok(obstacle.height >= 52 && obstacle.height <= 124);
+      assert.ok(obstacle.width >= 39 && obstacle.width <= 80.6);
+      assert.ok(obstacle.height >= 33.8 && obstacle.height <= 80.6);
       if (obstacle.shortWindow) shortAvailable++; else longOnly++;
       kinds.add(obstacle.kind);
       shapes.add(`${Math.round(obstacle.width)}x${Math.round(obstacle.height)}`);

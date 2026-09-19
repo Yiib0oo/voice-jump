@@ -2,7 +2,8 @@ import { STEP, GROUND_Y, PLAYER, RESET_SECONDS, START_SPEED, MAX_SPEED, beginJum
   flightDuration, intersects, speedAt, stepBody } from "./physics.ts";
 export type Window = { start: number; end: number };
 export type ObstacleKind = "goomba" | "shell" | "pipe" | "bricks" | "koopa";
-export const OBSTACLE_SCALE = 2;
+// 相比上一版（2 倍），宽高各缩小 35%，保留 65%。
+export const OBSTACLE_SCALE = 1.3;
 export type PlannedObstacle = {
   kind: ObstacleKind;
   arrival: number; width: number; height: number; passed: boolean;
