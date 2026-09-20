@@ -1,5 +1,6 @@
 export const STEP = 1 / 120;
-export const GROUND_Y = 350;
+export const WORLD_HEIGHT = 560;
+export const GROUND_Y = 480;
 export const PLAYER = { x: 90, width: 60, height: 68 };
 export const HOLD_SECONDS = 0.25;
 export const RESET_SECONDS = 0.18;

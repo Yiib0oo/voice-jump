@@ -65,7 +65,7 @@ startButton.addEventListener("click", async () => {
     detector.setTriggerLevel(calibration.triggerLevel);
     updateThresholdMark(calibration.triggerLevel);
 
-    audioStatus.textContent = "短喊短跳、稍长喊长跳，安静后再喊下一次；也可轻点／长按游戏画面。";
+    audioStatus.textContent = "原有声控已开启：第一声起跳，安静后空中再发声可二段跳；落地／落平台补满。也支持点击和空格，此版尚未加入专用鼓掌识别。";
     startButton.hidden = true;
     detector.reset();
     resetManualInput();

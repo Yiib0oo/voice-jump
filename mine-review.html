@@ -1,0 +1,13 @@
+<!doctype html><html lang="zh"><meta charset="utf-8"><title>矿道段落预览</title>
+<style>body{background:#18202b;color:white;font:16px system-ui;margin:16px}button{padding:10px;margin:4px}canvas{width:100%;max-width:900px;display:block;image-rendering:pixelated}</style>
+<button data-bay="0">矿壁一</button><button data-bay="1">矿壁二</button><button data-bay="2">矿壁三</button><button data-bay="3">矿壁四</button><button id="motion">开始滚动</button><canvas width="900" height="560"></canvas>
+<script type="module">
+import {SceneRenderer} from '/src/game/SceneRenderer.ts';
+import {createRunner,runDistance} from '/src/game/Adventure.ts';
+let distance=0,moving=false,last=0;const ctx=document.querySelector('canvas').getContext('2d');
+const scene=new SceneRenderer(draw);
+function draw(){scene.background(ctx,56,distance);[{kind:'spikes',x:230,width:65,top:432},{kind:'platform',x:340,width:150,top:390},{kind:'platform',x:535,width:155,top:322},{kind:'spikes',x:470,width:190,top:432},{kind:'opossum',x:790,width:65,top:434}].forEach((item,id)=>scene.terrain(ctx,{...item,id,x:item.x+runDistance(56)},56));scene.player(ctx,createRunner(),56,'running')}
+document.querySelectorAll('[data-bay]').forEach(b=>b.onclick=()=>{distance=Number(b.dataset.bay)*1024/.06;draw()});
+document.querySelector('#motion').onclick=()=>{moving=!moving;document.querySelector('#motion').textContent=moving?'暂停滚动':'开始滚动'};
+function tick(now){if(moving){distance+=Math.min(.05,(now-last)/1000)*520;draw()}last=now;requestAnimationFrame(tick)}requestAnimationFrame(tick);draw();
+</script></html>

@@ -35,7 +35,7 @@ button {
   display: block;
   width: 100%;
   height: auto;
-  aspect-ratio: 15 / 7;
+  aspect-ratio: 45 / 28;
   border: 3px solid #243f6b;
   background: #5c94fc;
   touch-action: none;

@@ -1,5 +1,8 @@
 import { GROUND_Y, PLAYER, distanceAt, type JumpBody } from "./physics.ts";
 import { obstacleX, type PlannedObstacle } from "./ObstaclePlanner.ts";
+import { terrainX, isAnimal, patrolDirection, type Terrain, type Runner } from "./Adventure.ts";
+import { SunnyLand, sceneWeights } from "./SunnyLand.ts";
+import { drawThemedHazard } from "./HazardArt.ts";
 
 const AVATARS = {
   normal: { url: new URL("../../图片库/正常付饶.jpg", import.meta.url).href,
@@ -9,14 +12,15 @@ const AVATARS = {
 };
 const SOURCES = {
   player: "player.png", enemy: "enemy.png", tiles: "tiles.png",
-  cloud: "cloud.gif", bush: "bush.gif", ground: "ground.png",
 };
 type Sprite = keyof typeof SOURCES | keyof typeof AVATARS;
 type Crop = [number, number, number, number];
 
 export class SceneRenderer {
   private readonly images = new Map<Sprite, HTMLImageElement>();
+  private readonly sunny: SunnyLand;
   constructor(redraw: () => void) {
+    this.sunny = new SunnyLand(redraw);
     for (const [key, filename] of Object.entries(SOURCES)) {
       this.load(key as Sprite, new URL(`assets/mario/${filename}`, document.baseURI).href, redraw);
     }
@@ -39,47 +43,13 @@ export class SceneRenderer {
     return true;
   }
 
-  background(ctx: CanvasRenderingContext2D, time: number): void {
-    const distance = distanceAt(time);
-    ctx.imageSmoothingEnabled = false;
-    ctx.fillStyle = "#5c94fc";
-    ctx.fillRect(0, 0, 900, 420);
-    // 三种速度的远景：云最慢，山丘其次，近处灌木更快。
-    for (let i = -1; i < 7; i++) {
-      const x = i * 220 - distance * 0.10 % 220;
-      const size = i % 2 === 0 ? 1.3 : 1;
-      this.sprite(ctx, "cloud", x + 24, 30 + ((i + 7) % 3) * 37, 78 * size, 58 * size);
-    }
-    for (let i = -1; i < 6; i++) {
-      const x = i * 280 - distance * 0.22 % 280;
-      const height = i % 2 === 0 ? 132 : 84;
-      const halfWidth = height * 0.75;
-      ctx.fillStyle = i % 2 === 0 ? "#159b23" : "#32b33a";
-      ctx.beginPath();
-      ctx.moveTo(x, GROUND_Y);
-      for (let step = 0; step <= 8; step++) {
-        ctx.lineTo(x + halfWidth * step / 8, GROUND_Y - height * step / 8);
-        ctx.lineTo(x + halfWidth * (step + 1) / 8, GROUND_Y - height * step / 8);
-      }
-      for (let step = 8; step >= 0; step--) {
-        ctx.lineTo(x + halfWidth * (2 - step / 8), GROUND_Y - height * step / 8);
-        ctx.lineTo(x + halfWidth * (2 - step / 8), GROUND_Y - height * Math.max(0, step - 1) / 8);
-      }
-      ctx.closePath(); ctx.fill();
-      ctx.fillStyle = "#0c651a";
-      ctx.fillRect(x + halfWidth - 16, GROUND_Y - height * 0.36, 5, 12);
-      ctx.fillRect(x + halfWidth + 6, GROUND_Y - height * 0.36, 5, 12);
-    }
-    for (let i = -1; i < 8; i++) {
-      const x = i * 180 - distance * 0.43 % 180;
-      this.sprite(ctx, "bush", x + 28, GROUND_Y - 36, i % 2 === 0 ? 108 : 78, 36);
-    }
-    ctx.fillStyle = "#b85d21";
-    ctx.fillRect(0, GROUND_Y, 900, 70);
-    const tileSize = 42;
-    for (let x = -(distance % tileSize); x < 900; x += tileSize) {
-      for (let y = GROUND_Y; y < 420; y += tileSize) this.sprite(ctx, "ground", x, y, tileSize, tileSize);
-    }
+  background(ctx: CanvasRenderingContext2D, time: number, distance = distanceAt(time)): void {
+    if (this.sunny.background(ctx, distance, 1, time)) return;
+    // A neutral loading fallback; the discontinued seasonal art never flashes through.
+    ctx.fillStyle = "#27b9ee";
+    ctx.fillRect(0, 0, 900, GROUND_Y);
+    ctx.fillStyle = "#6b4059";
+    ctx.fillRect(0, GROUND_Y, 900, 80);
   }
 
   obstacle(ctx: CanvasRenderingContext2D, obstacle: PlannedObstacle, time: number): void {
@@ -110,6 +80,64 @@ export class SceneRenderer {
         ctx.restore(); break;
     }
     if (!drawn) { ctx.fillStyle = "#b85d21"; ctx.fillRect(x, y, width, height); }
+  }
+
+  terrain(ctx: CanvasRenderingContext2D, item: Terrain, time: number): void {
+    const x = Math.round(terrainX(item, time));
+    if (x > 900 || x + item.width < 0) return;
+    const { top, width } = item;
+    ctx.imageSmoothingEnabled = false;
+    if (isAnimal(item)) {
+      if (this.sunny?.animal(ctx, item, x, time)) return;
+      const frame = Math.floor(time * 7) % 2;
+      const height = GROUND_Y - top;
+      const crop: Crop = [frame * 16, 16, 16, 16];
+      ctx.save();
+      ctx.translate(x + width / 2, top);
+      // 原始乌龟朝左；转向时只翻转贴图，碰撞与绘制共用巡逻轨迹。
+      ctx.scale(patrolDirection(item, time) > 0 ? -1 : 1, 1);
+      if (!this.sprite(ctx, "enemy", -width / 2, 0, width, height, crop)) {
+        ctx.fillStyle = "#9d512a";
+        ctx.fillRect(-width * 0.35, 6, width * 0.7, height - 14);
+        ctx.fillRect(-width * 0.46, height - 10, width * 0.28, 10);
+        ctx.fillRect(width * 0.18, height - 10, width * 0.28, 10);
+      }
+      ctx.restore();
+    } else if (item.kind === "platform") {
+      if (this.sunny?.platform(ctx, x, top, width)) return;
+      ctx.fillStyle = "#173e48";
+      ctx.fillRect(x, top, width, 23);
+      ctx.fillStyle = "#f4dfa0";
+      ctx.fillRect(x + 3, top + 8, width - 6, 12);
+      ctx.fillStyle = "#4bd49a";
+      ctx.fillRect(x, top, width, 7);
+      ctx.fillStyle = "#1b866e";
+      for (let offset = 12; offset < width - 6; offset += 26) ctx.fillRect(x + offset, top + 13, 5, 6);
+    } else {
+      const weights = this.sunny?.hazardWeights(time) ?? sceneWeights(time);
+      drawThemedHazard(ctx, x, top, width, weights.forest, weights.mine);
+    }
+    // 关卡标签仅作内部描述；场景元素依靠轮廓和颜色区分，不贴文字说明。
+  }
+
+  jet(ctx: CanvasRenderingContext2D, body: Runner): void {
+    if (body.jet <= 0) return;
+    const x = PLAYER.x + PLAYER.width / 2;
+    const y = body.y + PLAYER.height;
+    const flicker = Math.floor(body.jet * 65) % 2;
+    const length = 18 + body.jet / 0.24 * 24 + flicker * 5;
+    ctx.fillStyle = "#193c65";
+    ctx.fillRect(x - 13, y - 3, 26, 8);
+    ctx.fillStyle = "#37caff";
+    ctx.fillRect(x - 10, y + 5, 20, length * 0.60);
+    ctx.fillRect(x - 6, y + length * 0.60, 12, length * 0.40);
+    ctx.fillStyle = "#fff3a3";
+    ctx.fillRect(x - 5, y + 5, 10, length * 0.58);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(x - 3, y + 5, 6, 8);
+    ctx.fillStyle = "#8beaff";
+    ctx.fillRect(x - 20 - flicker * 4, y + 14, 5, 5);
+    ctx.fillRect(x + 18, y + 24 + flicker * 5, 4, 4);
   }
 
   player(ctx: CanvasRenderingContext2D, body: JumpBody, time: number, state: string): void {
